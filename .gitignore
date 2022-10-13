@@ -1,0 +1,4 @@
+/conf/config.yml
+*.log
+.idea
+venv
