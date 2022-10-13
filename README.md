@@ -27,8 +27,9 @@
 Тип: Несколько строк - Тег: links
 ```
 5. Создать REST-Коннектор и указать URL `http://<IP>:9080/ioc?identifier={{tag.IDENTIFIER}}`, метод GET, где IP - адрес расположения сервиса. Если сервис будет работать на хосте SOAR, то 127.0.0.1
-6. Переименовать `conf/config.yml.sample` в `conf/config.yml`.
-7. Вписать в `config.yml` адрес R-Vision SOAR и токены.
-8. Собрать образ `docker build -t rstintegration .`
-9. В `docker-compose.yml` для volume указать расположение директорий `conf` и `log`
-10. Запустить контейнер `docker-compose up -d`
+6. Выставить в коннекторе таймаут 60 сек.
+7. Переименовать `conf/config.yml.sample` в `conf/config.yml`.
+8. Вписать в `config.yml` адрес R-Vision SOAR и токены.
+9. Собрать образ `docker build -t rstintegration .`
+10. В `docker-compose.yml` для volume указать расположение директорий `conf` и `log`
+11. Запустить контейнер `docker-compose up -d`
