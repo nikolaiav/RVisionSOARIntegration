@@ -1,0 +1,10 @@
+version: '3'
+services:
+  rstcloud-rvisionsoar:
+    image: rstintegration:latest
+    ports:
+      - "9080:80"
+    volumes:
+      - /root/integration/conf:/rstcloud/conf
+      - /root/integration/logs:/rstcloud/logs
+    restart: always

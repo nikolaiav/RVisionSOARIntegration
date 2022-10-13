@@ -1,0 +1,9 @@
+soar:
+  url: 'https://127.0.0.1'
+  token: '<TOKEN>'
+  timeout: 10
+  field: 'iocs_threats'
+rst:
+  url: 'https://api.rstcloud.net'
+  token: '<TOKEN>'
+  timeout: 10
