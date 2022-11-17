@@ -1,0 +1,16 @@
+[Unit]
+Description=RST Cloud. R-Vision SOAR integration
+After=network.target
+
+[Service]
+Type=simple
+PIDFile=/run/rstrvisionintegration.pid
+WorkingDirectory=/opt/RVisionSOARIntegration
+ExecStart=/usr/local/bin/uvicorn app.main:app --host 0.0.0.0 --port 9080
+ExecReload=/bin/kill -HUP ${MAINPID}
+RestartSec=2
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+

@@ -12,7 +12,7 @@
 - Сервис, получив запрос от Коннектора, делает запрос поля `iocs` инцидента через API R-Vision SOAR.
 - Получив индикаторы, Сервис запрашивает их в RST Cloud API.
 - Собрав все данные Сервис отправляет их в виде запроса на обновление заданного в конфиге поля инцидента.
-## Инсталляция
+## Развертывание в docker
 1. Сгенерировать API-токен в R-Vision SOAR.
 2. Создать новое поле инцидента `iocs_threats` в R-Vision SOAR.
 3. Указать что данное поле имеет тим Массив.
@@ -33,3 +33,18 @@
 9. Собрать образ `docker build -t rstintegration .`
 10. В `docker-compose.yml` для volume указать расположение директорий `conf` и `log`
 11. Запустить контейнер `docker-compose up -d`
+
+## Развертывание в systemd
+1. Установить python 3.7
+2. Выполнить
+```pip3.7 install -r requirements.txt
+cd /opt
+git clone https://github.com/rstcloud/RVisionSOARIntegration.git
+cd RVisionSOARIntegration
+mkdir logs
+mv conf/config.yml.sample conf/config.yml
+cp rvisionrstintegration.service /etc/systemd/system/
+```
+3. Отредактировать `conf/config.yml`
+4. `systemctl enable rvisionrstintegration`
+5. `systemctl start rvisionrstintegration`
