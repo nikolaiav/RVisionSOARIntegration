@@ -1,6 +1,6 @@
 import os
 import logging
-from typing import List, Union
+from typing import List, Union, Dict, Any
 
 from requests import Session
 from cachetools import cachedmethod, TTLCache
@@ -13,13 +13,22 @@ requests.packages.urllib3.disable_warnings()
 log = logging.getLogger('RVisionSOARIntegration')
 
 
+def create_fields_list(fields_conf: Dict[str, List[Dict[str, str]]]):
+    ret: Dict[str, str] = dict()
+    for ioc_type, fields in fields_conf.items():
+        for i in fields:
+            ret[i['source']] = i['target']
+    return ret
+
+
 class RVisionSOARIntegration:
     def __init__(self, config: dict):
         self.cache = TTLCache(maxsize=1024, ttl=43200)
         self.SOAR_URL = config['soar'].get('url', 'https://127.0.0.1')
         self.SOAR_TOKEN = config['soar'].get('token', 'unknown')
         self.SOAR_TIMEOUT = config['soar'].get('timeout', 10)
-        self.SOAR_FIELD = config['soar'].get('field', 'unknown')
+        self.FIELDS = create_fields_list(config['soar'].get('fields', dict()))
+        self.SOAR_FIELDS = str(list(self.FIELDS)).replace('\'', '"')
         self.SOAR_URL_API_INCIDENTS = self.SOAR_URL + '/api/v2/incidents'
 
         self.RST_URL = config['rst'].get('url', 'https://api.rstcloud.net')
@@ -46,7 +55,7 @@ class RVisionSOARIntegration:
 
     @cachedmethod(lambda self: self.cache)
     def enrich(self, ioc):
-        ret = {'ioc': ioc}
+        ret: List[Dict[str, Any]] = list()
         response = self.exec_request(self.rst_session,
                                      self.RST_URL_API_IOC,
                                      timeout=self.RST_TIMEOUT,
@@ -55,17 +64,22 @@ class RVisionSOARIntegration:
 
         js = response.json()
         if js.get('error') is not None:
-            ret['src'] = js['error']
-            return ret
-        ret['first_seen'] = datetime.fromtimestamp(int(js['fseen']), tz=timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
-        ret['last_seen'] = datetime.fromtimestamp(int(js['lseen']), tz=timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
-        ret['tags'] = '\n'.join(js.get('tags', {}).get('str', []))
-        ret['links'] = '\n'.join(js.get('src', {}).get('report', '').split(','))
-        ret['threats'] = '\n'.join(js.get('threat', []))
-        ret['score'] = int(js.get('score', {}).get('total', 0))
-        ret['fp_alarm'] = js.get('fp', {}).get('descr', '')
-        if ret['fp_alarm'] == '':
-            ret['fp_alarm'] = 'Not FP'
+            if js['error'] == 'Not Found':
+                return [{'rst_field': 'Unknown', 'rst_value': 'Not Found'}]
+            log.error('Server return error: ' + str(js))
+            raise Exception('Error: ' + str(js))
+        ret.append({'rst_field': 'first_seen', 'rst_value': datetime.fromtimestamp(int(js['fseen']), tz=timezone.utc).strftime('%Y-%m-%d')})
+        ret.append({'rst_field': 'last_seen', 'rst_value': datetime.fromtimestamp(int(js['lseen']), tz=timezone.utc).strftime('%Y-%m-%d')})
+        ret.append({'rst_field': 'tags', 'rst_value': '\n'.join(js.get('tags', {}).get('str', []))})
+        ret.append({'rst_field': 'links', 'rst_value': '\n'.join(js.get('src', {}).get('report', '').split(','))})
+        ret.append({'rst_field': 'threats', 'rst_value': '\n'.join(js.get('threat', []))})
+        ret.append({'rst_field': 'score', 'rst_value': int(js.get('score', {}).get('total', 0))})
+        fp_alarm = js.get('fp', {}).get('descr', '')
+        if fp_alarm == '':
+            ret.append({'rst_field': 'fp_alarm', 'rst_value': 'Not FP'})
+        else:
+            ret.append({'rst_field': 'fp_alarm', 'rst_value': js.get('fp', {}).get('descr', '')})
+
         return ret
 
     def send_enriched_iocs(self, identifier: str):
@@ -74,39 +88,38 @@ class RVisionSOARIntegration:
                                      self.SOAR_URL_API_INCIDENTS,
                                      timeout=self.SOAR_TIMEOUT,
                                      headers={'X-Token': self.SOAR_TOKEN},
-                                     params={'fields': '["iocs"]',
-                                             'filter': '[{"property": "identifier", "value": "'+identifier+'"}]'})
+                                     params={'fields': self.SOAR_FIELDS,
+                                             'filter': '[{"property": "identifier", "value": "' + identifier + '"}]'})
         js = response.json()
-        result = js.get('data', {}).get('result', [])
-        if len(result) == 0:
+        if len(js) == 0:
             self.close_sessions()
             log.error('No incident body for id: {}'.format(identifier))
             return
 
-        iocs = set()
-        for i in result[0].get('iocs', []):
-            if i.get('x_type', '') not in ['ip', 'domain', 'url', 'md5', 'sha1', 'sha256']: continue
-            iocs.add(i.get('x_value'))
-
-        if len(iocs) == 0:
+        result = js.get('data', {}).get('result', [])
+        if len(result) == 0:
             self.close_sessions()
             log.info('No iocs for id: {}'.format(identifier))
             return
 
-        log.info('Get {} iocs for id: {}'.format(len(iocs), identifier))
+        enriched_iocs: Dict = dict()
+        for i in result:
+            log.info('Get {} iocs for id: {}'.format(len(i), identifier))
+            for source_field, ioc in i.items():
+                if ioc is None: continue
+                target_field: str = self.FIELDS.get(source_field)
+                enriched_iocs[target_field] = self.enrich(ioc)
 
-        log.info('Try to enrich iocs for id: {}'.format(len(iocs), identifier))
-        enriched_iocs: List[dict] = list()
-        for i in iocs:
-            enriched_iocs.append(self.enrich(i))
-
-        log.info('Try to update incident with id: {}'.format(len(iocs), identifier))
+        log.info('Try to update incident with id: {}'.format(len(enriched_iocs), identifier))
+        body = dict()
+        body['identifier'] = identifier
+        body.update(enriched_iocs)
         self.exec_request(self.soar_session,
                           self.SOAR_URL_API_INCIDENTS,
                           method='POST',
                           timeout=self.SOAR_TIMEOUT,
                           headers={'X-Token': self.SOAR_TOKEN},
-                          json={'identifier': identifier, self.SOAR_FIELD: enriched_iocs})
+                          json=body)
 
         self.close_sessions()
         log.info('Jobs done for id: {}'.format(identifier))

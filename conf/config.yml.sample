@@ -2,8 +2,28 @@ soar:
   url: 'https://127.0.0.1'
   token: '<TOKEN>'
   timeout: 10
-  field: 'iocs_threats'
+  fields:
+    ip:
+      - source: 'ioc_ip_source'
+        target: 'ioc_ip_verdict_src_rst'
+      - source: 'ioc_ip_destination'
+        target: 'ioc_ip_verdict_dst_rst'
+    domain:
+      - source: 'ioc_hostname'
+        target: 'ioc_domain_verdict_hostname_rst'
+      - source: 'ioc_fqdn_backup'
+        target: 'ioc_domain_verdict_fqdn_rst'
+    url:
+      - source: 'ioc_url'
+        target: 'ioc_url_verdict_rst'
+    hash:
+      - source: 'ioc_hash_md5'
+        target: 'ioc_hash_verdict_md5_rst'
+      - source: 'ioc_hash_sha1'
+        target: 'ioc_hash_verdict_sha1_rst'
+      - source: 'ioc_hash_sha256'
+        target: 'ioc_hash_verdict_sha256_rst'
 rst:
   url: 'https://api.rstcloud.net'
   token: '<TOKEN>'
-  timeout: 10
+  timeout: 60
