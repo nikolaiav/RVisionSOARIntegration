@@ -29,6 +29,7 @@ class RVisionSOARIntegration:
         self.SOAR_TIMEOUT = config['soar'].get('timeout', 10)
         self.FIELDS = create_fields_list(config['soar'].get('fields', dict()))
         self.SOAR_FIELDS = str(list(self.FIELDS)).replace('\'', '"')
+        log.debug('Init with fields map: ' + str(self.FIELDS))
         self.SOAR_URL_API_INCIDENTS = self.SOAR_URL + '/api/v2/incidents'
 
         self.RST_URL = config['rst'].get('url', 'https://api.rstcloud.net')
