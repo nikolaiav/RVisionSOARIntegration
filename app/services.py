@@ -66,9 +66,9 @@ class RVisionSOARIntegration:
         js = response.json()
         if js.get('error') is not None:
             if js['error'] == 'Not Found':
-                return [{'rst_field': 'Unknown', 'rst_value': 'Not Found'}]
+                return [{'rst_field': 'links', 'rst_value': 'Not Found'}]
             log.error('Server return error: ' + str(js))
-            raise Exception('Error: ' + str(js))
+            return [{'rst_field': 'links', 'rst_value': 'Error: Bad request'}]
         ret.append({'rst_field': 'first_seen', 'rst_value': datetime.fromtimestamp(int(js['fseen']), tz=timezone.utc).strftime('%Y-%m-%d')})
         ret.append({'rst_field': 'last_seen', 'rst_value': datetime.fromtimestamp(int(js['lseen']), tz=timezone.utc).strftime('%Y-%m-%d')})
         ret.append({'rst_field': 'tags', 'rst_value': '\n'.join(js.get('tags', {}).get('str', []))})
